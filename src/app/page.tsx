@@ -410,7 +410,7 @@ export default function MarksAIR() {
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat }} />
                 CAT 2025
               </div>
-              <span className={`text-xs ${muted} ml-auto`}>↑ higher = better percentile</span>
+              <span className={`text-xs ${muted} ml-auto`}> lower = better percentile; righter = more marks</span>
             </div>
           )}
 
