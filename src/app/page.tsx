@@ -24,7 +24,6 @@ const DATA_2025 = [
   { m: 46.47, r: 5765 }, { m: 40.94, r: 8706 },
 ];
 
-// Interpolates rank for ANY marks value using the sorted dataset
 function interpolateRank(data: { m: number; r: number }[], marks: number): number {
   const sorted = [...data].sort((a, b) => b.m - a.m);
   if (marks >= sorted[0].m) return sorted[0].r;
@@ -47,6 +46,7 @@ function MoonIcon() {
     </svg>
   );
 }
+
 function SunIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -76,7 +76,6 @@ export default function GateMarksAIR() {
     const textColor = isDark ? "#797876" : "#7a7974";
 
     chartRef.current?.destroy();
-    chartRef.current = null;
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
@@ -91,8 +90,8 @@ export default function GateMarksAIR() {
             pointBackgroundColor: c1,
             pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
             pointBorderWidth: 2,
-            pointRadius: 5,
-            pointHoverRadius: 5,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             borderWidth: 2.5,
             tension: 0.35,
             fill: false,
@@ -104,8 +103,8 @@ export default function GateMarksAIR() {
             pointBackgroundColor: c2,
             pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
             pointBorderWidth: 2,
-            pointRadius: 5,
-            pointHoverRadius: 5,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             borderWidth: 2.5,
             tension: 0.35,
             fill: false,
@@ -115,7 +114,6 @@ export default function GateMarksAIR() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        // Disable built-in tooltip entirely — we use our own
         plugins: {
           legend: { display: false },
           tooltip: { enabled: false },
@@ -127,7 +125,7 @@ export default function GateMarksAIR() {
             min: 35,
             max: 100,
             title: { display: true, text: "Marks", color: textColor },
-            ticks: { color: textColor, stepSize: 5 },
+            ticks: { color: textColor, stepSize: 10 },
             grid: { color: gridColor },
             border: { color: gridColor },
           },
@@ -139,7 +137,7 @@ export default function GateMarksAIR() {
             ticks: {
               color: textColor,
               callback: (val) => {
-                const nice = [1, 5, 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+                const nice = [1, 10, 100, 1000, 5000, 10000];
                 return nice.includes(Number(val)) ? Number(val).toLocaleString() : "";
               },
             },
@@ -156,8 +154,8 @@ export default function GateMarksAIR() {
     return () => { chartRef.current?.destroy(); };
   }, [buildChart]);
 
-  // Custom mousemove: convert pixel x → marks value → interpolate both datasets
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  // Using Pointer events to handle both mouse and touch elegantly
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const chart = chartRef.current;
     if (!chart) return;
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
@@ -168,7 +166,6 @@ export default function GateMarksAIR() {
     const yScale = chart.scales["y"];
     if (!xScale || !yScale) return;
 
-    // Clamp to chart area
     if (
       mouseX < xScale.left || mouseX > xScale.right ||
       mouseY < yScale.top  || mouseY > yScale.bottom
@@ -182,17 +179,20 @@ export default function GateMarksAIR() {
     const r26 = interpolateRank(DATA_2026, clampedMarks);
     const r25 = interpolateRank(DATA_2025, clampedMarks);
 
-    // Position tooltip: prefer right of cursor, flip left if near edge
     const tooltipWidth = 190;
     let tx = mouseX + 14;
-    if (tx + tooltipWidth > rect.width) tx = mouseX - tooltipWidth - 14;
+    
+    // Smart flip and clamp for mobile screens
+    if (tx + tooltipWidth > rect.width) {
+      tx = mouseX - tooltipWidth - 14;
+      if (tx < 0) tx = (rect.width - tooltipWidth) / 2;
+    }
 
     setHover({ x: tx, y: Math.max(8, mouseY - 40), marks: clampedMarks, r26, r25 });
   }, []);
 
-  const handleMouseLeave = useCallback(() => setHover(null), []);
+  const handlePointerLeave = useCallback(() => setHover(null), []);
 
-  // Theme tokens
   const bg      = isDark ? "bg-[#171614]"     : "bg-[#f7f6f2]";
   const surface = isDark ? "bg-[#1c1b19]"     : "bg-[#f9f8f5]";
   const sfOff   = isDark ? "bg-[#1d1c1a]"     : "bg-[#f3f0ec]";
@@ -204,61 +204,58 @@ export default function GateMarksAIR() {
   const dot26   = isDark ? "bg-[#4f98a3]"     : "bg-[#01696f]";
   const dot25   = isDark ? "bg-[#fdab43]"     : "bg-[#964219]";
 
-  const tooltipBg     = isDark ? "#201f1d" : "#f9f8f5";
-  const tooltipBorder = isDark ? "#393836" : "#d4d1ca";
+  // Added opacity to bg for glassmorphism
+  const tooltipBg     = isDark ? "rgba(32, 31, 29, 0.85)" : "rgba(249, 248, 245, 0.85)";
+  const tooltipBorder = isDark ? "rgba(57, 56, 54, 0.6)" : "rgba(212, 209, 202, 0.6)";
   const tooltipText   = isDark ? "#cdccca" : "#28251d";
   const tooltipMuted  = isDark ? "#797876" : "#7a7974";
 
   return (
     <div
-      className={`${bg} ${text} min-h-dvh flex flex-col px-4 py-8 transition-colors duration-300`}
+      className={`${bg} ${text} min-h-dvh flex flex-col p-4 sm:px-6 sm:py-8 transition-colors duration-300`}
       style={{ fontFamily: "Satoshi, Inter, sans-serif" }}
     >
-      {/* Header */}
-      <header className="w-full max-w-[1200px] mx-auto flex justify-between items-start mb-5 gap-4 flex-wrap">
+      <header className="w-full max-w-[1200px] mx-auto flex justify-between items-start mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold leading-tight">GATE CSE — Marks vs AIR</h1>
-          <p className={`${muted} text-sm mt-1.5`}>
-            2025 &amp; 2026 cutoff comparison — hover chart or drag slider to estimate rank.
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight tracking-tight">GATE CSE — Marks vs AIR</h1>
+          <p className={`${muted} text-xs sm:text-sm mt-1.5`}>
+            2025 &amp; 2026 cutoff comparison — estimate your rank.
           </p>
         </div>
         <button
           onClick={() => setIsDark((d) => !d)}
-          className={`${surface} ${border} border rounded-lg px-3 py-2 flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap transition-colors duration-200`}
+          className={`${surface} ${border} border rounded-lg px-3 py-2 flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap hover:opacity-80 transition-all active:scale-95`}
         >
           {isDark ? <SunIcon /> : <MoonIcon />}
-          Toggle theme
+          <span className="hidden sm:inline">Toggle theme</span>
         </button>
       </header>
 
-      {/* Main layout */}
-      <div className="w-full max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-4 flex-1">
+      <div className="w-full max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-5 flex-1">
 
-        {/* Chart card */}
-        <div className={`flex-1 min-w-0 ${surface} ${border} border rounded-xl p-5 shadow-md flex flex-col`}>
-          <div className="flex gap-5 mb-3 flex-wrap">
-            <div className={`flex items-center gap-2 text-sm ${muted}`}>
+        {/* Chart card - Appears SECOND on mobile, FIRST on desktop */}
+        <div className={`flex-1 min-w-0 ${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col order-2 lg:order-1`}>
+          <div className="flex gap-4 sm:gap-5 mb-4 flex-wrap">
+            <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
               <span className={`w-3 h-3 rounded-full ${dot26} shrink-0`} />
               2026 GATE CSE
             </div>
-            <div className={`flex items-center gap-2 text-sm ${muted}`}>
+            <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
               <span className={`w-3 h-3 rounded-full ${dot25} shrink-0`} />
               2025 GATE CSE
             </div>
           </div>
 
-          {/* Canvas wrapper — custom tooltip lives here */}
           <div
-            className="relative flex-1 min-h-[360px] cursor-crosshair"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
+            className="relative flex-1 min-h-[280px] sm:min-h-[360px] cursor-crosshair touch-pan-y"
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
           >
             <canvas ref={canvasRef} />
 
-            {/* Custom tooltip */}
             {hover && (
               <div
-                className="pointer-events-none absolute z-20 rounded-xl text-sm shadow-lg"
+                className="pointer-events-none absolute z-20 rounded-xl text-sm shadow-xl backdrop-blur-md transition-opacity duration-150"
                 style={{
                   left: hover.x,
                   top: hover.y,
@@ -266,14 +263,14 @@ export default function GateMarksAIR() {
                   border: `1px solid ${tooltipBorder}`,
                   color: tooltipText,
                   minWidth: 190,
-                  padding: "10px 14px",
+                  padding: "12px 16px",
                 }}
               >
-                <p className="font-bold mb-2" style={{ color: tooltipText }}>
+                <p className="font-bold mb-3 border-b pb-2" style={{ color: tooltipText, borderColor: tooltipBorder }}>
                   Marks: {hover.marks.toFixed(2)}
                 </p>
-                <div className="flex items-center justify-between gap-4 mb-1">
-                  <span className="flex items-center gap-1.5" style={{ color: tooltipMuted }}>
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <span className="flex items-center gap-2" style={{ color: tooltipMuted }}>
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: isDark ? "#4f98a3" : "#01696f" }} />
                     2026
                   </span>
@@ -282,7 +279,7 @@ export default function GateMarksAIR() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="flex items-center gap-1.5" style={{ color: tooltipMuted }}>
+                  <span className="flex items-center gap-2" style={{ color: tooltipMuted }}>
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: isDark ? "#fdab43" : "#964219" }} />
                     2025
                   </span>
@@ -295,14 +292,13 @@ export default function GateMarksAIR() {
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="lg:w-[260px] shrink-0 flex flex-col gap-4">
-
-          {/* Slider */}
-          <div className={`${surface} ${border} border rounded-xl p-5 shadow-md`}>
-            <h2 className="text-base font-bold mb-3">Estimate Your Rank</h2>
-            <label className={`${muted} text-xs block mb-2`} htmlFor="marksSlider">
-              Drag to set marks
+        {/* Sidebar - Appears FIRST on mobile, SECOND on desktop */}
+        <div className="lg:w-[280px] shrink-0 flex flex-col gap-4 sm:gap-5 order-1 lg:order-2">
+          
+          <div className={`${surface} ${border} border rounded-2xl p-5 shadow-sm`}>
+            <h2 className="text-sm sm:text-base font-bold mb-3">Estimate Your Rank</h2>
+            <label className={`${muted} text-xs block mb-3`} htmlFor="marksSlider">
+              Drag the slider to set marks
             </label>
             <input
               id="marksSlider"
@@ -310,36 +306,37 @@ export default function GateMarksAIR() {
               min={30} max={100} step={0.1}
               value={marks}
               onChange={(e) => setMarks(parseFloat(e.target.value))}
-              className="w-full cursor-pointer"
+              className="w-full cursor-pointer h-1.5 rounded-lg appearance-none bg-black/10 dark:bg-white/10 outline-none"
               style={{ accentColor: primary }}
             />
-            <div className="text-4xl font-bold tabular-nums text-center mt-4 mb-0.5">
+            <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mt-5 mb-1 tracking-tight">
               {marks.toFixed(1)}
             </div>
-            <p className={`text-xs text-center ${muted}`}>out of 100</p>
+            <p className={`text-xs text-center font-medium uppercase tracking-wider ${muted}`}>out of 100</p>
           </div>
 
-          {/* 2026 result */}
-          <div className={`${surface} ${border} border rounded-xl p-5 shadow-md`}>
-            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: primary }}>
-              2026 — Estimated AIR
-            </p>
-            <div className={`${sfOff} ${border} border rounded-lg px-4 py-3`}>
-              <span className="text-3xl font-bold tabular-nums">
-                {rank2026 <= 1 ? "~1" : `~${rank2026.toLocaleString()}`}
-              </span>
+          {/* Grid layout on mobile so cards sit side by side */}
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-5">
+            <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between`}>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-3" style={{ color: primary }}>
+                2026 Estimate
+              </p>
+              <div className={`${sfOff} ${border} border rounded-xl px-3 py-3 sm:px-4 sm:py-4`}>
+                <span className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                  {rank2026 <= 1 ? "~1" : `~${rank2026.toLocaleString()}`}
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* 2025 result */}
-          <div className={`${surface} ${border} border rounded-xl p-5 shadow-md`}>
-            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accent2 }}>
-              2025 — Estimated AIR
-            </p>
-            <div className={`${sfOff} ${border} border rounded-lg px-4 py-3`}>
-              <span className="text-3xl font-bold tabular-nums">
-                {rank2025 <= 1 ? "~1" : `~${rank2025.toLocaleString()}`}
-              </span>
+            <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between`}>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accent2 }}>
+                2025 Estimate
+              </p>
+              <div className={`${sfOff} ${border} border rounded-xl px-3 py-3 sm:px-4 sm:py-4`}>
+                <span className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                  {rank2025 <= 1 ? "~1" : `~${rank2025.toLocaleString()}`}
+                </span>
+              </div>
             </div>
           </div>
 

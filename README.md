@@ -2,6 +2,9 @@
 
 This application provides an interactive visualization of GATE CSE (Computer Science Engineering) marks versus AIR (All India Rank) data. The data is gathered from online sources and represents actual student results.
 
+## 🚀 Live Demo
+**Try it now**: https://gate-cse-ranks-to-marks-interpolati.vercel.app/
+
 ## Features
 
 - **Interactive Chart**: Compare 2025 and 2026 GATE CSE cutoffs with a logarithmic scale
