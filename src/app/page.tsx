@@ -306,7 +306,7 @@ export default function GateMarksAIR() {
               min={30} max={100} step={0.1}
               value={marks}
               onChange={(e) => setMarks(parseFloat(e.target.value))}
-              className="w-full cursor-pointer h-1.5 rounded-lg appearance-none bg-black/10 dark:bg-white/10 outline-none"
+              className="w-full cursor-pointer"
               style={{ accentColor: primary }}
             />
             <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mt-5 mb-1 tracking-tight">
