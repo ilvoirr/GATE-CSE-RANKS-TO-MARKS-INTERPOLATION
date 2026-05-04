@@ -13,12 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GATE MARKS - RANK INTERPOLATION",
-  description: "GET A IDEA OF NORMALISED MARKS TO GATE RANK",
+  title: "GATE & CAT MARKS - RANK INTERPOLATION",
+  description: "GET A IDEA OF NORMALISED MARKS TO GATE RANK AND SCALED SCORE TO CAT RANK/PERCENTILE",
 };
 
 export default function RootLayout({
-  children,
+  children, 
 }: Readonly<{
   children: React.ReactNode;
 }>) {
