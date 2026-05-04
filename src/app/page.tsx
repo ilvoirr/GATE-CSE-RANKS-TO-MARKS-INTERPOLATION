@@ -212,7 +212,7 @@ export default function GateMarksAIR() {
 
   return (
     <div
-      className={`${bg} ${text} min-h-dvh flex flex-col p-4 sm:px-6 sm:py-8 transition-colors duration-300`}
+      className={`${bg} ${text} min-h-[100dvh] flex flex-col p-4 sm:px-6 sm:py-8 transition-colors duration-300`}
       style={{ fontFamily: "Satoshi, Inter, sans-serif" }}
     >
       <header className="w-full max-w-[1200px] mx-auto flex justify-between items-start mb-6 gap-4 flex-wrap">
