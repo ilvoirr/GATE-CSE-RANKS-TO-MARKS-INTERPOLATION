@@ -87,7 +87,6 @@ function interpolateRank(data: { m: number; r: number }[], marks: number): numbe
 
 function interpolateCAT(marks: number): { r: number; p: number } {
   const sorted = [...CAT_DATA].sort((a, b) => b.m - a.m);
-  // Hard clamp to actual data boundaries — no extrapolation beyond top/bottom
   if (marks >= sorted[0].m) return { r: sorted[0].r, p: sorted[0].p };
   if (marks <= sorted[sorted.length - 1].m) return { r: sorted[sorted.length - 1].r, p: sorted[sorted.length - 1].p };
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -135,9 +134,9 @@ export default function MarksAIR() {
   const [isDark, setIsDark] = useState(true);
   const [mode, setMode] = useState<ExamMode>("gate");
   
-  // Independent state for GATE & CAT to prevent conflicts
+  // Independent state for GATE & CAT
   const [gateMarks, setGateMarks] = useState(62);
-  const [catScores, setCatScores] = useState({ varc: 27, dilr: 26, qa: 27 }); // defaults to 80 total
+  const [catScores, setCatScores] = useState({ varc: 27, dilr: 26, qa: 27 });
   
   const [hover, setHover] = useState<HoverInfo>(null);
 
@@ -172,6 +171,7 @@ export default function MarksAIR() {
     if (!canvasRef.current) return;
     const gridColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)";
     const tickColor = isDark ? "#797876" : "#7a7974";
+    const pageBg    = isDark ? "#171614" : "#f7f6f2";
 
     chartRef.current?.destroy();
     const ctx = canvasRef.current.getContext("2d");
@@ -190,6 +190,7 @@ export default function MarksAIR() {
               pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
               pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
               borderWidth: 2.5, tension: 0.35, fill: false,
+              order: 1,
             },
             {
               label: "2025",
@@ -199,7 +200,20 @@ export default function MarksAIR() {
               pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
               pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
               borderWidth: 2.5, tension: 0.35, fill: false,
+              order: 2,
             },
+            // Dynamic dot dataset for slider tracking
+            {
+              label: "Current 2026",
+              data: [],
+              pointBackgroundColor: isDark ? "#4f98a3" : "#01696f",
+              pointBorderColor: pageBg,
+              pointBorderWidth: 3,
+              pointRadius: 8,
+              pointHoverRadius: 8,
+              showLine: false,
+              order: 0,
+            }
           ],
         },
         options: {
@@ -208,7 +222,7 @@ export default function MarksAIR() {
           hover: { mode: undefined },
           scales: {
             x: {
-              type: "linear", min: 35, max: 100,
+              type: "linear", min: 30, max: 100,
               title: { display: true, text: "Marks", color: tickColor },
               ticks: { color: tickColor, stepSize: 10 },
               grid: { color: gridColor }, border: { color: gridColor },
@@ -232,15 +246,30 @@ export default function MarksAIR() {
       chartRef.current = new Chart(ctx, {
         type: "line",
         data: {
-          datasets: [{
-            label: "CAT 2025",
-            data: catSorted.map((d) => ({ x: d.m, y: 100 - d.p })),
-            borderColor: isDark ? "#a78bfa" : "#6d28d9",
-            pointBackgroundColor: isDark ? "#a78bfa" : "#6d28d9",
-            pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
-            pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
-            borderWidth: 2.5, tension: 0.35, fill: false,
-          }],
+          datasets: [
+            {
+              label: "CAT 2025",
+              data: catSorted.map((d) => ({ x: d.m, y: 100 - d.p })),
+              borderColor: isDark ? "#a78bfa" : "#6d28d9",
+              pointBackgroundColor: isDark ? "#a78bfa" : "#6d28d9",
+              pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
+              pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+              borderWidth: 2.5, tension: 0.35, fill: false,
+              order: 1,
+            },
+            // Dynamic dot dataset for slider tracking
+            {
+              label: "Your Score",
+              data: [],
+              pointBackgroundColor: isDark ? "#f472b6" : "#be185d",
+              pointBorderColor: pageBg,
+              pointBorderWidth: 3,
+              pointRadius: 8,
+              pointHoverRadius: 8,
+              showLine: false,
+              order: 0,
+            }
+          ],
         },
         options: {
           responsive: true, maintainAspectRatio: false,
@@ -248,9 +277,9 @@ export default function MarksAIR() {
           hover: { mode: undefined },
           scales: {
             x: {
-              type: "linear", min: 15, max: 150,
+              type: "linear", min: 0, max: 198,
               title: { display: true, text: "Marks", color: tickColor },
-              ticks: { color: tickColor, stepSize: 15 },
+              ticks: { color: tickColor, stepSize: 20 },
               grid: { color: gridColor }, border: { color: gridColor },
             },
             y: {
@@ -279,10 +308,25 @@ export default function MarksAIR() {
     }
   }, [isDark, mode]);
 
+  // Handle Chart Creation
   useEffect(() => {
     buildChart();
     return () => { chartRef.current?.destroy(); };
   }, [buildChart]);
+
+  // Handle Smooth Point Updates (Without re-rendering the whole chart)
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    if (mode === "gate" && chart.data.datasets.length >= 3) {
+      chart.data.datasets[2].data = [{ x: gateMarks, y: interpolateRank(GATE_2026, gateMarks) }];
+      chart.update('none'); // 'none' prevents animation lag for smooth dragging
+    } else if (mode === "cat" && chart.data.datasets.length >= 2) {
+      chart.data.datasets[1].data = [{ x: catTotal, y: 100 - interpolateCAT(catTotal).p }];
+      chart.update('none');
+    }
+  }, [gateMarks, catTotal, mode]);
 
   useEffect(() => {
     setHover(null);
@@ -310,13 +354,13 @@ export default function MarksAIR() {
     }
 
     if (mode === "gate") {
-      const c = Math.min(100, Math.max(35, marksAtCursor));
+      const c = Math.min(100, Math.max(30, marksAtCursor));
       setHover({ x: tx, y: Math.max(8, mouseY - 44), marks: c,
         r26: interpolateRank(GATE_2026, c),
         r25: interpolateRank(GATE_2025, c),
       });
     } else {
-      const c = Math.min(145, Math.max(18, marksAtCursor));
+      const c = Math.min(198, Math.max(0, marksAtCursor));
       const { r, p } = interpolateCAT(c);
       setHover({ x: tx, y: Math.max(8, mouseY - 44), marks: c, catR: r, catP: p });
     }
@@ -398,6 +442,10 @@ export default function MarksAIR() {
               <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat }} />
                 CAT 2025
+              </div>
+              <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat2 }} />
+                Your Score Marker
               </div>
               <span className={`text-xs ${muted} ml-auto`}> lower = better percentile; righter = more marks</span>
             </div>
@@ -552,7 +600,7 @@ export default function MarksAIR() {
 
               {/* Total Sum Display */}
               <div className="pt-4 mt-2 border-t" style={{ borderColor: isDark ? "#393836" : "#d4d1ca" }}>
-                <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mb-1 tracking-tight">
+                <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mb-1 tracking-tight" style={{ color: accentCat2 }}>
                   {catTotal}
                 </div>
                 <p className={`text-[10px] sm:text-xs text-center font-medium uppercase tracking-wider ${muted}`}>
