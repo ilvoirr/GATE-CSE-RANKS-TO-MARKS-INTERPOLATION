@@ -134,12 +134,17 @@ export default function MarksAIR() {
   const chartRef = useRef<Chart | null>(null);
   const [isDark, setIsDark] = useState(true);
   const [mode, setMode] = useState<ExamMode>("gate");
-  const [marks, setMarks] = useState(62);
+  
+  // Independent state for GATE & CAT to prevent conflicts
+  const [gateMarks, setGateMarks] = useState(62);
+  const [catScores, setCatScores] = useState({ varc: 27, dilr: 26, qa: 27 }); // defaults to 80 total
+  
   const [hover, setHover] = useState<HoverInfo>(null);
 
-  const rank2026 = interpolateRank(GATE_2026, marks);
-  const rank2025 = interpolateRank(GATE_2025, marks);
-  const catResult = interpolateCAT(marks);
+  const catTotal = catScores.varc + catScores.dilr + catScores.qa;
+  const rank2026 = interpolateRank(GATE_2026, gateMarks);
+  const rank2025 = interpolateRank(GATE_2025, gateMarks);
+  const catResult = interpolateCAT(catTotal);
 
   // ── Theme tokens ─────────────────────────────────────────────────────────────
   const bg      = isDark ? "bg-[#171614]"     : "bg-[#f7f6f2]";
@@ -222,9 +227,6 @@ export default function MarksAIR() {
         },
       });
     } else {
-      // CAT: X = marks (15–150), Y = 100 - percentile (transformed so high %ile = top of chart)
-      // We plot (100 - p) on Y so 100%ile is at the top, 50%ile at the bottom.
-      // Ticks are relabelled back to real percentile values.
       const catSorted = [...CAT_DATA].sort((a, b) => a.m - b.m);
 
       chartRef.current = new Chart(ctx, {
@@ -232,7 +234,6 @@ export default function MarksAIR() {
         data: {
           datasets: [{
             label: "CAT 2025",
-            // y = 100 - p gives top = 100%ile (y=0), bottom = 50%ile (y=50)
             data: catSorted.map((d) => ({ x: d.m, y: 100 - d.p })),
             borderColor: isDark ? "#a78bfa" : "#6d28d9",
             pointBackgroundColor: isDark ? "#a78bfa" : "#6d28d9",
@@ -253,16 +254,13 @@ export default function MarksAIR() {
               grid: { color: gridColor }, border: { color: gridColor },
             },
             y: {
-              // y range: 0 (100%ile) to 52 (just below 50%ile)
-              // REVERSED so low y-values (high percentile) appear at top
               type: "linear",
               min: 0,
               max: 52,
-              reverse: false, // we handle direction via the transform
+              reverse: false, 
               title: { display: true, text: "Percentile", color: tickColor },
               ticks: {
                 color: tickColor,
-                // Show key percentile milestones — relabel from (100-p) back to p
                 callback: (val) => {
                   const pctile = 100 - Number(val);
                   const milestones = [100, 99.99, 99.9, 99.5, 99, 98, 95, 90, 80, 70, 50];
@@ -287,7 +285,6 @@ export default function MarksAIR() {
   }, [buildChart]);
 
   useEffect(() => {
-    setMarks(mode === "gate" ? 62 : 80);
     setHover(null);
   }, [mode]);
 
@@ -327,12 +324,6 @@ export default function MarksAIR() {
 
   const handlePointerLeave = useCallback(() => setHover(null), []);
 
-  // ── Slider config ─────────────────────────────────────────────────────────────
-  const sliderMin   = mode === "gate" ? 30  : 18;
-  const sliderMax   = mode === "gate" ? 100 : 145;
-  const sliderStep  = mode === "gate" ? 0.1 : 0.5;
-  const sliderColor = mode === "gate" ? primary : accentCat;
-
   return (
     <div
       className={`${bg} ${text} min-h-[100dvh] flex flex-col p-4 sm:px-6 sm:py-8 transition-colors duration-300`}
@@ -352,7 +343,6 @@ export default function MarksAIR() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Exam toggle */}
           <div
             className={`${surface} ${border} border rounded-xl p-1 flex items-center gap-0.5`}
             role="group"
@@ -378,7 +368,6 @@ export default function MarksAIR() {
             })}
           </div>
 
-          {/* Theme toggle */}
           <button
             onClick={() => setIsDark((d) => !d)}
             className={`${surface} ${border} border rounded-xl px-3 py-2 flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap hover:opacity-80 transition-all active:scale-95`}
@@ -437,7 +426,6 @@ export default function MarksAIR() {
                   transition: "opacity 0.1s",
                 }}
               >
-                {/* Marks header row */}
                 <div
                   className="flex items-center justify-between mb-2 pb-2"
                   style={{ borderBottom: `1px solid ${tooltipBorder}` }}
@@ -489,27 +477,90 @@ export default function MarksAIR() {
         {/* ── Sidebar ── */}
         <div className="lg:w-[280px] shrink-0 flex flex-col gap-4 sm:gap-5 order-1 lg:order-2">
 
-          <div className={`${surface} ${border} border rounded-2xl p-5 shadow-sm`}>
-            <h2 className="text-sm sm:text-base font-bold mb-3">Estimate Your {mode === "gate" ? "Rank" : "Percentile"}</h2>
-            <label className={`${muted} text-xs block mb-3`} htmlFor="marksSlider">
-              Drag the slider to set marks
-            </label>
-            <input
-              id="marksSlider"
-              type="range"
-              min={sliderMin} max={sliderMax} step={sliderStep}
-              value={marks}
-              onChange={(e) => setMarks(parseFloat(e.target.value))}
-              className="w-full cursor-pointer"
-              style={{ accentColor: sliderColor }}
-            />
-            <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mt-5 mb-1 tracking-tight">
-              {marks.toFixed(1)}
+          {mode === "gate" ? (
+            <div className={`${surface} ${border} border rounded-2xl p-5 shadow-sm`}>
+              <h2 className="text-sm sm:text-base font-bold mb-3">Estimate Your Rank</h2>
+              <label className={`${muted} text-xs block mb-3`} htmlFor="marksSlider">
+                Drag the slider to set marks
+              </label>
+              <input
+                id="marksSlider"
+                type="range"
+                min={30} max={100} step={0.1}
+                value={gateMarks}
+                onChange={(e) => setGateMarks(parseFloat(e.target.value))}
+                className="w-full cursor-pointer"
+                style={{ accentColor: primary }}
+              />
+              <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mt-5 mb-1 tracking-tight">
+                {gateMarks.toFixed(1)}
+              </div>
+              <p className={`text-xs text-center font-medium uppercase tracking-wider ${muted}`}>
+                out of 100
+              </p>
             </div>
-            <p className={`text-xs text-center font-medium uppercase tracking-wider ${muted}`}>
-              out of {mode === "gate" ? "100" : "198"}
-            </p>
-          </div>
+          ) : (
+            <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm`}>
+              <h2 className="text-sm sm:text-base font-bold mb-4">Estimate Percentile</h2>
+              
+              <div className="flex flex-col gap-4">
+                {/* VARC Slider */}
+                <div>
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="text-xs font-semibold" style={{ color: accentCat }}>VARC</label>
+                    <span className="text-sm font-bold tabular-nums">{catScores.varc} <span className={`text-xs font-normal ${muted}`}>/ 72</span></span>
+                  </div>
+                  <input
+                    type="range" min={0} max={72} step={1}
+                    value={catScores.varc}
+                    onChange={(e) => setCatScores(prev => ({ ...prev, varc: parseInt(e.target.value) }))}
+                    className="w-full cursor-pointer"
+                    style={{ accentColor: accentCat }}
+                  />
+                </div>
+
+                {/* DILR Slider */}
+                <div>
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="text-xs font-semibold" style={{ color: accentCat }}>DILR</label>
+                    <span className="text-sm font-bold tabular-nums">{catScores.dilr} <span className={`text-xs font-normal ${muted}`}>/ 60</span></span>
+                  </div>
+                  <input
+                    type="range" min={0} max={60} step={1}
+                    value={catScores.dilr}
+                    onChange={(e) => setCatScores(prev => ({ ...prev, dilr: parseInt(e.target.value) }))}
+                    className="w-full cursor-pointer"
+                    style={{ accentColor: accentCat }}
+                  />
+                </div>
+
+                {/* QA Slider */}
+                <div className="mb-2">
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="text-xs font-semibold" style={{ color: accentCat }}>QA</label>
+                    <span className="text-sm font-bold tabular-nums">{catScores.qa} <span className={`text-xs font-normal ${muted}`}>/ 66</span></span>
+                  </div>
+                  <input
+                    type="range" min={0} max={66} step={1}
+                    value={catScores.qa}
+                    onChange={(e) => setCatScores(prev => ({ ...prev, qa: parseInt(e.target.value) }))}
+                    className="w-full cursor-pointer"
+                    style={{ accentColor: accentCat }}
+                  />
+                </div>
+              </div>
+
+              {/* Total Sum Display */}
+              <div className="pt-4 mt-2 border-t" style={{ borderColor: isDark ? "#393836" : "#d4d1ca" }}>
+                <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mb-1 tracking-tight">
+                  {catTotal}
+                </div>
+                <p className={`text-[10px] sm:text-xs text-center font-medium uppercase tracking-wider ${muted}`}>
+                  Total Marks (Out of 198)
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Result cards */}
           {mode === "gate" ? (
