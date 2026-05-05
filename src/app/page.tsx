@@ -202,9 +202,8 @@ export default function MarksAIR() {
               borderWidth: 2.5, tension: 0.35, fill: false,
               order: 2,
             },
-            // Dynamic dot dataset for slider tracking
             {
-              label: "Current 2026",
+              label: "Current",
               data: [],
               pointBackgroundColor: isDark ? "#4f98a3" : "#01696f",
               pointBorderColor: pageBg,
@@ -257,7 +256,6 @@ export default function MarksAIR() {
               borderWidth: 2.5, tension: 0.35, fill: false,
               order: 1,
             },
-            // Dynamic dot dataset for slider tracking
             {
               label: "Your Score",
               data: [],
@@ -277,26 +275,22 @@ export default function MarksAIR() {
           hover: { mode: undefined },
           scales: {
             x: {
-              type: "linear", min: 0, max: 198,
+              // Reduced max to 150 to make the graph look better
+              type: "linear", min: 0, max: 150,
               title: { display: true, text: "Marks", color: tickColor },
-              ticks: { color: tickColor, stepSize: 20 },
+              ticks: { color: tickColor, stepSize: 25 },
               grid: { color: gridColor }, border: { color: gridColor },
             },
             y: {
-              type: "linear",
-              min: 0,
-              max: 52,
-              reverse: false, 
+              type: "linear", min: 0, max: 52, reverse: false, 
               title: { display: true, text: "Percentile", color: tickColor },
               ticks: {
                 color: tickColor,
                 callback: (val) => {
                   const pctile = 100 - Number(val);
-                  const milestones = [100, 99.99, 99.9, 99.5, 99, 98, 95, 90, 80, 70, 50];
-                  const match = milestones.find((m) => Math.abs(m - pctile) < 0.06);
-                  if (match !== undefined) {
-                    return match === 100 ? "100%ile" : `${match}%ile`;
-                  }
+                  const milestones = [100, 99.9, 99, 95, 90, 80, 70, 50];
+                  const match = milestones.find((m) => Math.abs(m - pctile) < 0.1);
+                  if (match !== undefined) return match === 100 ? "100%ile" : `${match}%ile`;
                   return "";
                 },
               },
@@ -308,22 +302,23 @@ export default function MarksAIR() {
     }
   }, [isDark, mode]);
 
-  // Handle Chart Creation
   useEffect(() => {
     buildChart();
     return () => { chartRef.current?.destroy(); };
   }, [buildChart]);
 
-  // Handle Smooth Point Updates (Without re-rendering the whole chart)
+  // Handle Smooth Point Updates
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
 
     if (mode === "gate" && chart.data.datasets.length >= 3) {
       chart.data.datasets[2].data = [{ x: gateMarks, y: interpolateRank(GATE_2026, gateMarks) }];
-      chart.update('none'); // 'none' prevents animation lag for smooth dragging
+      chart.update('none'); 
     } else if (mode === "cat" && chart.data.datasets.length >= 2) {
-      chart.data.datasets[1].data = [{ x: catTotal, y: 100 - interpolateCAT(catTotal).p }];
+      // Clamp the visual dot to 150 so it doesn't fly off the chart if score > 150
+      const visualX = Math.max(0, Math.min(catTotal, 150));
+      chart.data.datasets[1].data = [{ x: visualX, y: 100 - interpolateCAT(catTotal).p }];
       chart.update('none');
     }
   }, [gateMarks, catTotal, mode]);
@@ -360,7 +355,7 @@ export default function MarksAIR() {
         r25: interpolateRank(GATE_2025, c),
       });
     } else {
-      const c = Math.min(198, Math.max(0, marksAtCursor));
+      const c = Math.min(150, Math.max(0, marksAtCursor));
       const { r, p } = interpolateCAT(c);
       setHover({ x: tx, y: Math.max(8, mouseY - 44), marks: c, catR: r, catP: p });
     }
@@ -370,16 +365,17 @@ export default function MarksAIR() {
 
   return (
     <div
-      className={`${bg} ${text} min-h-[100dvh] flex flex-col p-4 sm:px-6 sm:py-8 transition-colors duration-300`}
+      // Added min-h-[100dvh] for mobile, strict h-[100dvh] and overflow-hidden for desktop to kill scroll
+      className={`${bg} ${text} min-h-[100dvh] lg:h-[100dvh] lg:overflow-hidden flex flex-col p-4 sm:p-5 transition-colors duration-300`}
       style={{ fontFamily: "Satoshi, Inter, sans-serif" }}
     >
       {/* ── Header ── */}
-      <header className="w-full max-w-[1200px] mx-auto flex justify-between items-start mb-6 gap-4 flex-wrap">
+      <header className="flex-none w-full max-w-[1200px] mx-auto flex justify-between items-start mb-4 gap-4 flex-wrap">
         <div>
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight tracking-tight">
             {mode === "gate" ? "GATE CSE" : "CAT 2025"} — Marks vs {mode === "gate" ? "AIR" : "Percentile"}
           </h1>
-          <p className={`${muted} text-xs sm:text-sm mt-1.5`}>
+          <p className={`${muted} text-xs sm:text-sm mt-1`}>
             {mode === "gate"
               ? "2025 & 2026 cutoff comparison — estimate your rank."
               : "Score vs percentile — hover the chart to explore."}
@@ -387,11 +383,7 @@ export default function MarksAIR() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div
-            className={`${surface} ${border} border rounded-xl p-1 flex items-center gap-0.5`}
-            role="group"
-            aria-label="Exam selector"
-          >
+          <div className={`${surface} ${border} border rounded-xl p-1 flex items-center gap-0.5`}>
             {(["gate", "cat"] as ExamMode[]).map((m) => {
               const isActive = mode === m;
               const activeColor = m === "gate" ? primary : accentCat;
@@ -399,7 +391,7 @@ export default function MarksAIR() {
                 <button
                   key={m}
                   onClick={() => setMode(m)}
-                  className="relative px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
+                  className="relative px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
                   style={{
                     background: isActive ? activeColor + "1a" : "transparent",
                     color: isActive ? activeColor : isDark ? "#797876" : "#7a7974",
@@ -417,17 +409,18 @@ export default function MarksAIR() {
             className={`${surface} ${border} border rounded-xl px-3 py-2 flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap hover:opacity-80 transition-all active:scale-95`}
           >
             {isDark ? <SunIcon /> : <MoonIcon />}
-            <span className="hidden sm:inline">Toggle theme</span>
+            <span className="hidden sm:inline">Theme</span>
           </button>
         </div>
       </header>
 
-      <div className="w-full max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-5 flex-1">
+      {/* Main Content Wrapper - uses flex-1 min-h-0 to contain children within viewport on desktop */}
+      <div className="w-full max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-4 sm:gap-5 flex-1 min-h-0">
 
         {/* ── Chart card ── */}
-        <div className={`flex-1 min-w-0 ${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col order-2 lg:order-1`}>
+        <div className={`flex-1 min-w-0 min-h-0 ${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col order-2 lg:order-1`}>
           {mode === "gate" ? (
-            <div className="flex gap-4 sm:gap-5 mb-4 flex-wrap">
+            <div className="flex gap-4 sm:gap-5 mb-3 flex-wrap flex-none">
               <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
                 <span className={`w-3 h-3 rounded-full ${dot26} shrink-0`} />
                 2026 GATE CSE
@@ -438,7 +431,7 @@ export default function MarksAIR() {
               </div>
             </div>
           ) : (
-            <div className="flex gap-4 sm:gap-5 mb-4 flex-wrap items-center">
+            <div className="flex gap-4 sm:gap-5 mb-3 flex-wrap items-center flex-none">
               <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat }} />
                 CAT 2025
@@ -447,12 +440,12 @@ export default function MarksAIR() {
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat2 }} />
                 Your Score Marker
               </div>
-              <span className={`text-xs ${muted} ml-auto`}> lower = better percentile; righter = more marks</span>
             </div>
           )}
 
+          {/* Canvas container uses flex-1 min-h-[250px] on mobile, min-h-0 on desktop to shrink perfectly */}
           <div
-            className="relative flex-1 min-h-[280px] sm:min-h-[360px] cursor-crosshair touch-pan-y"
+            className="relative flex-1 min-h-[250px] lg:min-h-0 cursor-crosshair touch-pan-y"
             onPointerMove={handlePointerMove}
             onPointerLeave={handlePointerLeave}
           >
@@ -523,11 +516,11 @@ export default function MarksAIR() {
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="lg:w-[280px] shrink-0 flex flex-col gap-4 sm:gap-5 order-1 lg:order-2">
+        <div className="lg:w-[280px] shrink-0 flex flex-col gap-3 sm:gap-4 order-1 lg:order-2 overflow-y-auto lg:overflow-visible">
 
           {mode === "gate" ? (
-            <div className={`${surface} ${border} border rounded-2xl p-5 shadow-sm`}>
-              <h2 className="text-sm sm:text-base font-bold mb-3">Estimate Your Rank</h2>
+            <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm`}>
+              <h2 className="text-sm font-bold mb-2">Estimate Your Rank</h2>
               <label className={`${muted} text-xs block mb-3`} htmlFor="marksSlider">
                 Drag the slider to set marks
               </label>
@@ -540,23 +533,23 @@ export default function MarksAIR() {
                 className="w-full cursor-pointer"
                 style={{ accentColor: primary }}
               />
-              <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mt-5 mb-1 tracking-tight">
+              <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mt-4 mb-1 tracking-tight">
                 {gateMarks.toFixed(1)}
               </div>
-              <p className={`text-xs text-center font-medium uppercase tracking-wider ${muted}`}>
+              <p className={`text-[10px] text-center font-medium uppercase tracking-wider ${muted}`}>
                 out of 100
               </p>
             </div>
           ) : (
-            <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm`}>
-              <h2 className="text-sm sm:text-base font-bold mb-4">Estimate Percentile</h2>
+            <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm`}>
+              <h2 className="text-sm font-bold mb-3">Estimate Percentile</h2>
               
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 {/* VARC Slider */}
                 <div>
                   <div className="flex justify-between items-end mb-1">
                     <label className="text-xs font-semibold" style={{ color: accentCat }}>VARC</label>
-                    <span className="text-sm font-bold tabular-nums">{catScores.varc} <span className={`text-xs font-normal ${muted}`}>/ 72</span></span>
+                    <span className="text-sm font-bold tabular-nums">{catScores.varc} <span className={`text-[10px] font-normal ${muted}`}>/ 72</span></span>
                   </div>
                   <input
                     type="range" min={0} max={72} step={1}
@@ -571,7 +564,7 @@ export default function MarksAIR() {
                 <div>
                   <div className="flex justify-between items-end mb-1">
                     <label className="text-xs font-semibold" style={{ color: accentCat }}>DILR</label>
-                    <span className="text-sm font-bold tabular-nums">{catScores.dilr} <span className={`text-xs font-normal ${muted}`}>/ 60</span></span>
+                    <span className="text-sm font-bold tabular-nums">{catScores.dilr} <span className={`text-[10px] font-normal ${muted}`}>/ 60</span></span>
                   </div>
                   <input
                     type="range" min={0} max={60} step={1}
@@ -583,10 +576,10 @@ export default function MarksAIR() {
                 </div>
 
                 {/* QA Slider */}
-                <div className="mb-2">
+                <div className="mb-1">
                   <div className="flex justify-between items-end mb-1">
                     <label className="text-xs font-semibold" style={{ color: accentCat }}>QA</label>
-                    <span className="text-sm font-bold tabular-nums">{catScores.qa} <span className={`text-xs font-normal ${muted}`}>/ 66</span></span>
+                    <span className="text-sm font-bold tabular-nums">{catScores.qa} <span className={`text-[10px] font-normal ${muted}`}>/ 66</span></span>
                   </div>
                   <input
                     type="range" min={0} max={66} step={1}
@@ -599,11 +592,11 @@ export default function MarksAIR() {
               </div>
 
               {/* Total Sum Display */}
-              <div className="pt-4 mt-2 border-t" style={{ borderColor: isDark ? "#393836" : "#d4d1ca" }}>
-                <div className="text-4xl sm:text-5xl font-bold tabular-nums text-center mb-1 tracking-tight" style={{ color: accentCat2 }}>
+              <div className="pt-3 mt-2 border-t" style={{ borderColor: isDark ? "#393836" : "#d4d1ca" }}>
+                <div className="text-4xl font-bold tabular-nums text-center mb-1 tracking-tight" style={{ color: accentCat2 }}>
                   {catTotal}
                 </div>
-                <p className={`text-[10px] sm:text-xs text-center font-medium uppercase tracking-wider ${muted}`}>
+                <p className={`text-[10px] text-center font-medium uppercase tracking-wider ${muted}`}>
                   Total Marks (Out of 198)
                 </p>
               </div>
@@ -612,47 +605,47 @@ export default function MarksAIR() {
 
           {/* Result cards */}
           {mode === "gate" ? (
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-5">
-              <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between`}>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-3" style={{ color: primary }}>
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
+              <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: primary }}>
                   2026 Estimate
                 </p>
-                <div className={`${sfOff} ${border} border rounded-xl px-3 py-3 sm:px-4 sm:py-4`}>
-                  <span className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                <div className={`${sfOff} ${border} border rounded-xl px-3 py-2 sm:px-4 sm:py-3`}>
+                  <span className="text-xl sm:text-2xl font-bold tabular-nums tracking-tight">
                     ~{rank2026.toLocaleString()}
                   </span>
                 </div>
               </div>
-              <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between`}>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accent2 }}>
+              <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: accent2 }}>
                   2025 Estimate
                 </p>
-                <div className={`${sfOff} ${border} border rounded-xl px-3 py-3 sm:px-4 sm:py-4`}>
-                  <span className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                <div className={`${sfOff} ${border} border rounded-xl px-3 py-2 sm:px-4 sm:py-3`}>
+                  <span className="text-xl sm:text-2xl font-bold tabular-nums tracking-tight">
                     ~{rank2025.toLocaleString()}
                   </span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-5">
-              <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between`}>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accentCat }}>
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
+              <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: accentCat }}>
                   Percentile
                 </p>
-                <div className={`${sfOff} ${border} border rounded-xl px-3 py-3 sm:px-4 sm:py-4`}>
-                  <span className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                <div className={`${sfOff} ${border} border rounded-xl px-3 py-2 sm:px-4 sm:py-3`}>
+                  <span className="text-xl sm:text-2xl font-bold tabular-nums tracking-tight">
                     {catResult.p >= 100 ? "100" : catResult.p.toFixed(2)}
-                    <span className="text-sm font-medium ml-0.5">%ile</span>
+                    <span className="text-xs font-medium ml-0.5">%ile</span>
                   </span>
                 </div>
               </div>
-              <div className={`${surface} ${border} border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between`}>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accentCat2 }}>
+              <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: accentCat2 }}>
                   Rank
                 </p>
-                <div className={`${sfOff} ${border} border rounded-xl px-3 py-3 sm:px-4 sm:py-4`}>
-                  <span className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                <div className={`${sfOff} ${border} border rounded-xl px-3 py-2 sm:px-4 sm:py-3`}>
+                  <span className="text-xl sm:text-2xl font-bold tabular-nums tracking-tight">
                     ~{catResult.r.toLocaleString()}
                   </span>
                 </div>
