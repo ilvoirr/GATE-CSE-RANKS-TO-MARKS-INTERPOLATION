@@ -3,7 +3,7 @@
 This application provides interactive visualization of marks versus rank data for GATE CSE and CAT 2025 exams. The data is gathered from online sources and represents actual student results, helping aspirants estimate their ranks and percentiles based on their performance.
 
 ## 🚀 Live Demo
-**Try it now**: https://gate-cse-ranks-to-marks-interpolati.vercel.app/
+**Try it now**: [https://gate-cse-ranks-to-marks-interpolati.vercel.app/](https://gate-and-cat-marks-to-rank-interpol.vercel.app/)
 
 ## Features
 
