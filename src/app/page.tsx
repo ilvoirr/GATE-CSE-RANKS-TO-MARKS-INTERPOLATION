@@ -124,8 +124,10 @@ type HoverInfo = {
   x: number; y: number; marks: number;
   r26?: number; r25?: number;
   catR?: number; catP?: number;
+  varcP?: number; dilrP?: number; qaP?: number;
 } | null;
 type ExamMode = "gate" | "cat";
+type CatInputMode = "total" | "sections";
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function MarksAIR() {
@@ -136,27 +138,55 @@ export default function MarksAIR() {
   
   // Independent state for GATE & CAT
   const [gateMarks, setGateMarks] = useState(62);
+  
+  // CAT States
+  const [catInputMode, setCatInputMode] = useState<CatInputMode>("sections");
+  const [catTotalOnly, setCatTotalOnly] = useState(80);
   const [catScores, setCatScores] = useState({ varc: 27, dilr: 26, qa: 27 });
   
   const [hover, setHover] = useState<HoverInfo>(null);
 
-  const catTotal = catScores.varc + catScores.dilr + catScores.qa;
+  const currentCatTotal = catInputMode === "sections" 
+    ? catScores.varc + catScores.dilr + catScores.qa 
+    : catTotalOnly;
+
   const rank2026 = interpolateRank(GATE_2026, gateMarks);
   const rank2025 = interpolateRank(GATE_2025, gateMarks);
-  const catResult = interpolateCAT(catTotal);
+  
+  const catResult = interpolateCAT(currentCatTotal);
+  
+  // UI Sectional Results
+  const varcResult = interpolateCAT(catScores.varc * (198/72));
+  const dilrResult = interpolateCAT(catScores.dilr * (198/60));
+  const qaResult   = interpolateCAT(catScores.qa * (198/66));
+
+  // Sync state between total and sections based on proportions
+  const handleCatModeToggle = (newMode: CatInputMode) => {
+    if (newMode === catInputMode) return;
+    if (newMode === "total") {
+      setCatTotalOnly(catScores.varc + catScores.dilr + catScores.qa);
+    } else {
+      const t = catTotalOnly;
+      const varc = Math.round(t * (72 / 198));
+      const dilr = Math.round(t * (60 / 198));
+      const qa = t - varc - dilr; // remainder guarantees exact sum
+      setCatScores({ varc, dilr, qa });
+    }
+    setCatInputMode(newMode);
+  };
 
   // ── Theme tokens ─────────────────────────────────────────────────────────────
   const bg      = isDark ? "bg-[#171614]"     : "bg-[#f7f6f2]";
-  const surface = isDark ? "bg-[#1c1b19]"     : "bg-[#f9f8f5]";
-  const sfOff   = isDark ? "bg-[#1d1c1a]"     : "bg-[#f3f0ec]";
-  const border  = isDark ? "border-[#393836]" : "border-[#d4d1ca]";
+  const surface = isDark ? "bg-[#1c1b19]"     : "bg-[#ffffff]";
+  const sfOff   = isDark ? "bg-[#232220]"     : "bg-[#f3f0ec]";
+  const border  = isDark ? "border-[#393836]" : "border-[#e5e3db]";
   const text    = isDark ? "text-[#cdccca]"   : "text-[#28251d]";
-  const muted   = isDark ? "text-[#797876]"   : "text-[#7a7974]";
+  const muted   = isDark ? "text-[#797876]"   : "text-[#8a8880]";
 
   const primary   = isDark ? "#4f98a3" : "#01696f";
   const accent2   = isDark ? "#fdab43" : "#964219";
-  const accentCat = isDark ? "#a78bfa" : "#6d28d9";
-  const accentCat2 = isDark ? "#f472b6" : "#be185d";
+  const accentCat = isDark ? "#a78bfa" : "#8b5cf6";
+  const accentCat2 = isDark ? "#f472b6" : "#ec4899";
 
   const dot26  = isDark ? "bg-[#4f98a3]" : "bg-[#01696f]";
   const dot25  = isDark ? "bg-[#fdab43]" : "bg-[#964219]";
@@ -165,6 +195,11 @@ export default function MarksAIR() {
   const tooltipBorder = isDark ? "rgba(57,56,54,0.7)"  : "rgba(212,209,202,0.7)";
   const tooltipText   = isDark ? "#cdccca" : "#28251d";
   const tooltipMuted  = isDark ? "#797876" : "#7a7974";
+
+  // Section Colors
+  const varcColor = isDark ? "#60a5fa" : "#3b82f6";
+  const dilrColor = isDark ? "#34d399" : "#10b981";
+  const qaColor   = isDark ? "#fbbf24" : "#f59e0b";
 
   // ── Build chart ───────────────────────────────────────────────────────────────
   const buildChart = useCallback(() => {
@@ -187,7 +222,7 @@ export default function MarksAIR() {
               data: GATE_2026.map((d) => ({ x: d.m, y: d.r })),
               borderColor: isDark ? "#4f98a3" : "#01696f",
               pointBackgroundColor: isDark ? "#4f98a3" : "#01696f",
-              pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
+              pointBorderColor: isDark ? "#1c1b19" : "#ffffff",
               pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
               borderWidth: 2.5, tension: 0.35, fill: false,
               order: 1,
@@ -197,7 +232,7 @@ export default function MarksAIR() {
               data: GATE_2025.map((d) => ({ x: d.m, y: d.r })),
               borderColor: isDark ? "#fdab43" : "#964219",
               pointBackgroundColor: isDark ? "#fdab43" : "#964219",
-              pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
+              pointBorderColor: isDark ? "#1c1b19" : "#ffffff",
               pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
               borderWidth: 2.5, tension: 0.35, fill: false,
               order: 2,
@@ -241,41 +276,78 @@ export default function MarksAIR() {
       });
     } else {
       const catSorted = [...CAT_DATA].sort((a, b) => a.m - b.m);
+      const datasets: any[] = [
+        {
+          label: "Total Score",
+          data: catSorted.map((d) => ({ x: d.m, y: 100 - d.p })),
+          borderColor: isDark ? "#a78bfa" : "#8b5cf6",
+          pointBackgroundColor: isDark ? "#a78bfa" : "#8b5cf6",
+          pointBorderColor: isDark ? "#1c1b19" : "#ffffff",
+          pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+          borderWidth: 2.5, tension: 0.35, fill: false,
+          order: 1,
+        }
+      ];
+
+      // Dynamically generate section lines based on total scaling 
+      if (catInputMode === "sections") {
+        const generateSectionData = (maxMarks: number) => {
+          const d = [];
+          for(let i=0; i<=maxMarks; i+=3) {
+            d.push({ x: i, y: 100 - interpolateCAT(i * (198/maxMarks)).p });
+          }
+          return d;
+        };
+
+        datasets.push(
+          {
+            label: "VARC",
+            data: generateSectionData(72),
+            borderColor: varcColor,
+            pointRadius: 0, pointHoverRadius: 0,
+            borderWidth: 2, tension: 0.35, fill: false, borderDash: [4, 4],
+            order: 2,
+          },
+          {
+            label: "DILR",
+            data: generateSectionData(60),
+            borderColor: dilrColor,
+            pointRadius: 0, pointHoverRadius: 0,
+            borderWidth: 2, tension: 0.35, fill: false, borderDash: [4, 4],
+            order: 3,
+          },
+          {
+            label: "QA",
+            data: generateSectionData(66),
+            borderColor: qaColor,
+            pointRadius: 0, pointHoverRadius: 0,
+            borderWidth: 2, tension: 0.35, fill: false, borderDash: [4, 4],
+            order: 4,
+          }
+        );
+      }
+
+      datasets.push({
+        label: "Your Score",
+        data: [],
+        pointBackgroundColor: isDark ? "#f472b6" : "#ec4899",
+        pointBorderColor: pageBg,
+        pointBorderWidth: 3,
+        pointRadius: 8,
+        pointHoverRadius: 8,
+        showLine: false,
+        order: 0,
+      });
 
       chartRef.current = new Chart(ctx, {
         type: "line",
-        data: {
-          datasets: [
-            {
-              label: "CAT 2025",
-              data: catSorted.map((d) => ({ x: d.m, y: 100 - d.p })),
-              borderColor: isDark ? "#a78bfa" : "#6d28d9",
-              pointBackgroundColor: isDark ? "#a78bfa" : "#6d28d9",
-              pointBorderColor: isDark ? "#1c1b19" : "#f9f8f5",
-              pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
-              borderWidth: 2.5, tension: 0.35, fill: false,
-              order: 1,
-            },
-            {
-              label: "Your Score",
-              data: [],
-              pointBackgroundColor: isDark ? "#f472b6" : "#be185d",
-              pointBorderColor: pageBg,
-              pointBorderWidth: 3,
-              pointRadius: 8,
-              pointHoverRadius: 8,
-              showLine: false,
-              order: 0,
-            }
-          ],
-        },
+        data: { datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: { enabled: false } },
           hover: { mode: undefined },
           scales: {
             x: {
-              // Reduced max to 150 to make the graph look better
               type: "linear", min: 0, max: 150,
               title: { display: true, text: "Marks", color: tickColor },
               ticks: { color: tickColor, stepSize: 25 },
@@ -300,7 +372,7 @@ export default function MarksAIR() {
         },
       });
     }
-  }, [isDark, mode]);
+  }, [isDark, mode, catInputMode]);
 
   useEffect(() => {
     buildChart();
@@ -315,17 +387,19 @@ export default function MarksAIR() {
     if (mode === "gate" && chart.data.datasets.length >= 3) {
       chart.data.datasets[2].data = [{ x: gateMarks, y: interpolateRank(GATE_2026, gateMarks) }];
       chart.update('none'); 
-    } else if (mode === "cat" && chart.data.datasets.length >= 2) {
-      // Clamp the visual dot to 150 so it doesn't fly off the chart if score > 150
-      const visualX = Math.max(0, Math.min(catTotal, 150));
-      chart.data.datasets[1].data = [{ x: visualX, y: 100 - interpolateCAT(catTotal).p }];
-      chart.update('none');
+    } else if (mode === "cat") {
+      const visualX = Math.max(0, Math.min(currentCatTotal, 150));
+      const userDatasetIndex = chart.data.datasets.findIndex(ds => ds.label === "Your Score");
+      if (userDatasetIndex !== -1) {
+        chart.data.datasets[userDatasetIndex].data = [{ x: visualX, y: 100 - interpolateCAT(currentCatTotal).p }];
+        chart.update('none');
+      }
     }
-  }, [gateMarks, catTotal, mode]);
+  }, [gateMarks, currentCatTotal, mode, catInputMode]);
 
   useEffect(() => {
     setHover(null);
-  }, [mode]);
+  }, [mode, catInputMode]);
 
   // ── Pointer handlers ──────────────────────────────────────────────────────────
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -357,15 +431,22 @@ export default function MarksAIR() {
     } else {
       const c = Math.min(150, Math.max(0, marksAtCursor));
       const { r, p } = interpolateCAT(c);
-      setHover({ x: tx, y: Math.max(8, mouseY - 44), marks: c, catR: r, catP: p });
+      
+      let varcP, dilrP, qaP;
+      if (catInputMode === "sections") {
+        if (c <= 72) varcP = interpolateCAT(c * (198/72)).p;
+        if (c <= 60) dilrP = interpolateCAT(c * (198/60)).p;
+        if (c <= 66) qaP = interpolateCAT(c * (198/66)).p;
+      }
+      
+      setHover({ x: tx, y: Math.max(8, mouseY - 44), marks: c, catR: r, catP: p, varcP, dilrP, qaP });
     }
-  }, [mode]);
+  }, [mode, catInputMode]);
 
   const handlePointerLeave = useCallback(() => setHover(null), []);
 
   return (
     <div
-      // Added min-h-[100dvh] for mobile, strict h-[100dvh] and overflow-hidden for desktop to kill scroll
       className={`${bg} ${text} min-h-[100dvh] lg:h-[100dvh] lg:overflow-hidden flex flex-col p-4 sm:p-5 transition-colors duration-300`}
       style={{ fontFamily: "Satoshi, Inter, sans-serif" }}
     >
@@ -383,7 +464,7 @@ export default function MarksAIR() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div className={`${surface} ${border} border rounded-xl p-1 flex items-center gap-0.5`}>
+          <div className={`${surface} ${border} border rounded-xl p-1 flex items-center gap-0.5 shadow-sm`}>
             {(["gate", "cat"] as ExamMode[]).map((m) => {
               const isActive = mode === m;
               const activeColor = m === "gate" ? primary : accentCat;
@@ -394,7 +475,7 @@ export default function MarksAIR() {
                   className="relative px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
                   style={{
                     background: isActive ? activeColor + "1a" : "transparent",
-                    color: isActive ? activeColor : isDark ? "#797876" : "#7a7974",
+                    color: isActive ? activeColor : muted,
                     boxShadow: isActive ? `0 0 0 1px ${activeColor}44` : "none",
                   }}
                 >
@@ -406,7 +487,7 @@ export default function MarksAIR() {
 
           <button
             onClick={() => setIsDark((d) => !d)}
-            className={`${surface} ${border} border rounded-xl px-3 py-2 flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap hover:opacity-80 transition-all active:scale-95`}
+            className={`${surface} ${border} border rounded-xl px-3 py-2 flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap hover:opacity-80 transition-all active:scale-95 shadow-sm`}
           >
             {isDark ? <SunIcon /> : <MoonIcon />}
             <span className="hidden sm:inline">Theme</span>
@@ -414,7 +495,7 @@ export default function MarksAIR() {
         </div>
       </header>
 
-      {/* Main Content Wrapper - uses flex-1 min-h-0 to contain children within viewport on desktop */}
+      {/* Main Content Wrapper */}
       <div className="w-full max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-4 sm:gap-5 flex-1 min-h-0">
 
         {/* ── Chart card ── */}
@@ -434,8 +515,24 @@ export default function MarksAIR() {
             <div className="flex gap-4 sm:gap-5 mb-3 flex-wrap items-center flex-none">
               <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat }} />
-                CAT 2025
+                Total %ile
               </div>
+              {catInputMode === "sections" && (
+                <>
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
+                    <span className="w-3 h-1 rounded-full shrink-0" style={{ background: varcColor }} />
+                    VARC
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
+                    <span className="w-3 h-1 rounded-full shrink-0" style={{ background: dilrColor }} />
+                    DILR
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
+                    <span className="w-3 h-1 rounded-full shrink-0" style={{ background: qaColor }} />
+                    QA
+                  </div>
+                </>
+              )}
               <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium ${muted}`}>
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentCat2 }} />
                 Your Score Marker
@@ -443,7 +540,7 @@ export default function MarksAIR() {
             </div>
           )}
 
-          {/* Canvas container uses flex-1 min-h-[250px] on mobile, min-h-0 on desktop to shrink perfectly */}
+          {/* Canvas container */}
           <div
             className="relative flex-1 min-h-[250px] lg:min-h-0 cursor-crosshair touch-pan-y"
             onPointerMove={handlePointerMove}
@@ -497,14 +594,47 @@ export default function MarksAIR() {
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-2" style={{ color: tooltipMuted }}>
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: accentCat }} />
-                        <span className="text-xs">Percentile</span>
+                        <span className="text-xs">Total %ile</span>
                       </div>
                       <span className="font-semibold tabular-nums text-sm">{hover.catP?.toFixed(2)}%ile</span>
                     </div>
-                    <div className="flex items-center justify-between gap-6">
+                    
+                    {catInputMode === "sections" && (
+                      <>
+                        {hover.varcP !== undefined && (
+                          <div className="flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-2" style={{ color: tooltipMuted }}>
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: varcColor }} />
+                              <span className="text-xs">VARC %ile</span>
+                            </div>
+                            <span className="font-semibold tabular-nums text-sm">{hover.varcP.toFixed(2)}%ile</span>
+                          </div>
+                        )}
+                        {hover.dilrP !== undefined && (
+                          <div className="flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-2" style={{ color: tooltipMuted }}>
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dilrColor }} />
+                              <span className="text-xs">DILR %ile</span>
+                            </div>
+                            <span className="font-semibold tabular-nums text-sm">{hover.dilrP.toFixed(2)}%ile</span>
+                          </div>
+                        )}
+                        {hover.qaP !== undefined && (
+                          <div className="flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-2" style={{ color: tooltipMuted }}>
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: qaColor }} />
+                              <span className="text-xs">QA %ile</span>
+                            </div>
+                            <span className="font-semibold tabular-nums text-sm">{hover.qaP.toFixed(2)}%ile</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="flex items-center justify-between gap-6 pt-1 mt-0.5 border-t" style={{ borderColor: tooltipBorder }}>
                       <div className="flex items-center gap-2" style={{ color: tooltipMuted }}>
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: accentCat2 }} />
-                        <span className="text-xs">Rank</span>
+                        <span className="text-xs">Overall Rank</span>
                       </div>
                       <span className="font-semibold tabular-nums text-sm">~{hover.catR?.toLocaleString()}</span>
                     </div>
@@ -516,7 +646,7 @@ export default function MarksAIR() {
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="lg:w-[280px] shrink-0 flex flex-col gap-3 sm:gap-4 order-1 lg:order-2 overflow-y-auto lg:overflow-visible">
+        <div className="lg:w-[300px] shrink-0 flex flex-col gap-3 sm:gap-4 order-1 lg:order-2 overflow-y-auto lg:overflow-visible">
 
           {mode === "gate" ? (
             <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm`}>
@@ -541,69 +671,116 @@ export default function MarksAIR() {
               </p>
             </div>
           ) : (
-            <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm`}>
-              <h2 className="text-sm font-bold mb-3">Estimate Percentile</h2>
+            <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm flex flex-col`}>
               
-              <div className="flex flex-col gap-3">
-                {/* VARC Slider */}
-                <div>
-                  <div className="flex justify-between items-end mb-1">
-                    <label className="text-xs font-semibold" style={{ color: accentCat }}>VARC</label>
-                    <span className="text-sm font-bold tabular-nums">{catScores.varc} <span className={`text-[10px] font-normal ${muted}`}>/ 72</span></span>
-                  </div>
-                  <input
-                    type="range" min={0} max={72} step={1}
-                    value={catScores.varc}
-                    onChange={(e) => setCatScores(prev => ({ ...prev, varc: parseInt(e.target.value) }))}
-                    className="w-full cursor-pointer"
-                    style={{ accentColor: accentCat }}
-                  />
-                </div>
-
-                {/* DILR Slider */}
-                <div>
-                  <div className="flex justify-between items-end mb-1">
-                    <label className="text-xs font-semibold" style={{ color: accentCat }}>DILR</label>
-                    <span className="text-sm font-bold tabular-nums">{catScores.dilr} <span className={`text-[10px] font-normal ${muted}`}>/ 60</span></span>
-                  </div>
-                  <input
-                    type="range" min={0} max={60} step={1}
-                    value={catScores.dilr}
-                    onChange={(e) => setCatScores(prev => ({ ...prev, dilr: parseInt(e.target.value) }))}
-                    className="w-full cursor-pointer"
-                    style={{ accentColor: accentCat }}
-                  />
-                </div>
-
-                {/* QA Slider */}
-                <div className="mb-1">
-                  <div className="flex justify-between items-end mb-1">
-                    <label className="text-xs font-semibold" style={{ color: accentCat }}>QA</label>
-                    <span className="text-sm font-bold tabular-nums">{catScores.qa} <span className={`text-[10px] font-normal ${muted}`}>/ 66</span></span>
-                  </div>
-                  <input
-                    type="range" min={0} max={66} step={1}
-                    value={catScores.qa}
-                    onChange={(e) => setCatScores(prev => ({ ...prev, qa: parseInt(e.target.value) }))}
-                    className="w-full cursor-pointer"
-                    style={{ accentColor: accentCat }}
-                  />
+              {/* Premium Header & Toggle */}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-sm font-bold">Your Score</h2>
+                <div className={`flex items-center p-0.5 rounded-lg border ${border} ${sfOff}`}>
+                  <button
+                    onClick={() => handleCatModeToggle("total")}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${catInputMode === "total" ? `${surface} shadow-sm text-[${accentCat}]` : muted}`}
+                  >
+                    Total
+                  </button>
+                  <button
+                    onClick={() => handleCatModeToggle("sections")}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${catInputMode === "sections" ? `${surface} shadow-sm text-[${accentCat}]` : muted}`}
+                  >
+                    Sections
+                  </button>
                 </div>
               </div>
+              
+              <div className="flex flex-col gap-2.5">
+                {catInputMode === "total" ? (
+                  <div className={`p-3.5 rounded-xl border ${border} ${sfOff}`}>
+                    <div className="flex justify-between items-end mb-2">
+                      <label className="text-xs font-bold uppercase tracking-widest" style={{ color: accentCat }}>Total Marks</label>
+                      <span className="text-sm font-bold tabular-nums">{catTotalOnly} <span className={`text-[10px] font-medium opacity-60 ${muted}`}>/ 198</span></span>
+                    </div>
+                    <input
+                      type="range" min={0} max={198} step={1}
+                      value={catTotalOnly}
+                      onChange={(e) => setCatTotalOnly(parseInt(e.target.value))}
+                      className="w-full cursor-pointer"
+                      style={{ accentColor: accentCat }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {/* VARC Glass Slider */}
+                    <div className="p-3 rounded-xl border" style={{ borderColor: `${varcColor}33`, backgroundColor: `${varcColor}0d` }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: varcColor }}>VARC</label>
+                        <span className="text-sm font-bold tabular-nums" style={{ color: text }}>{catScores.varc} <span className="text-[10px] font-medium opacity-50">/ 72</span></span>
+                      </div>
+                      <input
+                        type="range" min={0} max={72} step={1}
+                        value={catScores.varc}
+                        onChange={(e) => setCatScores(prev => ({ ...prev, varc: parseInt(e.target.value) }))}
+                        className="w-full cursor-pointer"
+                        style={{ accentColor: varcColor }}
+                      />
+                    </div>
 
-              {/* Total Sum Display */}
-              <div className="pt-3 mt-2 border-t" style={{ borderColor: isDark ? "#393836" : "#d4d1ca" }}>
-                <div className="text-4xl font-bold tabular-nums text-center mb-1 tracking-tight" style={{ color: accentCat2 }}>
-                  {catTotal}
-                </div>
-                <p className={`text-[10px] text-center font-medium uppercase tracking-wider ${muted}`}>
-                  Total Marks (Out of 198)
-                </p>
+                    {/* DILR Glass Slider */}
+                    <div className="p-3 rounded-xl border" style={{ borderColor: `${dilrColor}33`, backgroundColor: `${dilrColor}0d` }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: dilrColor }}>DILR</label>
+                        <span className="text-sm font-bold tabular-nums" style={{ color: text }}>{catScores.dilr} <span className="text-[10px] font-medium opacity-50">/ 60</span></span>
+                      </div>
+                      <input
+                        type="range" min={0} max={60} step={1}
+                        value={catScores.dilr}
+                        onChange={(e) => setCatScores(prev => ({ ...prev, dilr: parseInt(e.target.value) }))}
+                        className="w-full cursor-pointer"
+                        style={{ accentColor: dilrColor }}
+                      />
+                    </div>
+
+                    {/* QA Glass Slider */}
+                    <div className="p-3 rounded-xl border" style={{ borderColor: `${qaColor}33`, backgroundColor: `${qaColor}0d` }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: qaColor }}>QA</label>
+                        <span className="text-sm font-bold tabular-nums" style={{ color: text }}>{catScores.qa} <span className="text-[10px] font-medium opacity-50">/ 66</span></span>
+                      </div>
+                      <input
+                        type="range" min={0} max={66} step={1}
+                        value={catScores.qa}
+                        onChange={(e) => setCatScores(prev => ({ ...prev, qa: parseInt(e.target.value) }))}
+                        className="w-full cursor-pointer"
+                        style={{ accentColor: qaColor }}
+                      />
+                    </div>
+
+                    {/* 4th Slider: Master Total Control */}
+                    <div className="mt-2 pt-3 border-t" style={{ borderColor: border }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: accentCat2 }}>Master Total</label>
+                        <span className="text-sm font-bold tabular-nums">{currentCatTotal} <span className={`text-[10px] font-medium opacity-60 ${muted}`}>/ 198</span></span>
+                      </div>
+                      <input
+                        type="range" min={0} max={198} step={1}
+                        value={currentCatTotal}
+                        onChange={(e) => {
+                          const t = parseInt(e.target.value);
+                          const varc = Math.round(t * (72 / 198));
+                          const dilr = Math.round(t * (60 / 198));
+                          const qa = t - varc - dilr;
+                          setCatScores({ varc, dilr, qa });
+                        }}
+                        className="w-full cursor-pointer"
+                        style={{ accentColor: accentCat2 }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          {/* Result cards */}
+          {/* Premium Result Dashboard */}
           {mode === "gate" ? (
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
               <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
@@ -628,28 +805,45 @@ export default function MarksAIR() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
-              <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: accentCat }}>
-                  Percentile
-                </p>
-                <div className={`${sfOff} ${border} border rounded-xl px-3 py-2 sm:px-4 sm:py-3`}>
-                  <span className="text-xl sm:text-2xl font-bold tabular-nums tracking-tight">
+            <div className="flex flex-col gap-3">
+              {/* Top Row: Total Percentile & Rank */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm flex flex-col items-start justify-center`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-80" style={{ color: accentCat }}>
+                    Total %ile
+                  </p>
+                  <span className="text-2xl font-bold tabular-nums tracking-tight">
                     {catResult.p >= 100 ? "100" : catResult.p.toFixed(2)}
-                    <span className="text-xs font-medium ml-0.5">%ile</span>
+                    <span className="text-xs font-medium ml-0.5 opacity-60">%ile</span>
                   </span>
                 </div>
-              </div>
-              <div className={`${surface} ${border} border rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col justify-between`}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: accentCat2 }}>
-                  Rank
-                </p>
-                <div className={`${sfOff} ${border} border rounded-xl px-3 py-2 sm:px-4 sm:py-3`}>
-                  <span className="text-xl sm:text-2xl font-bold tabular-nums tracking-tight">
+                <div className={`${surface} ${border} border rounded-2xl p-4 shadow-sm flex flex-col items-start justify-center`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-80" style={{ color: accentCat2 }}>
+                    Overall Rank
+                  </p>
+                  <span className="text-2xl font-bold tabular-nums tracking-tight">
                     ~{catResult.r.toLocaleString()}
                   </span>
                 </div>
               </div>
+
+              {/* Bottom Row: Sectional Cards (Visible only in Sections mode) */}
+              {catInputMode === "sections" && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border p-2.5 flex flex-col items-center justify-center shadow-sm" style={{ borderColor: `${varcColor}33`, backgroundColor: `${varcColor}0a` }}>
+                    <span className="text-[9px] font-bold uppercase tracking-widest mb-1 opacity-80" style={{ color: varcColor }}>VARC</span>
+                    <span className="text-sm font-bold tabular-nums">{varcResult.p >= 100 ? "100" : varcResult.p.toFixed(2)}</span>
+                  </div>
+                  <div className="rounded-xl border p-2.5 flex flex-col items-center justify-center shadow-sm" style={{ borderColor: `${dilrColor}33`, backgroundColor: `${dilrColor}0a` }}>
+                    <span className="text-[9px] font-bold uppercase tracking-widest mb-1 opacity-80" style={{ color: dilrColor }}>DILR</span>
+                    <span className="text-sm font-bold tabular-nums">{dilrResult.p >= 100 ? "100" : dilrResult.p.toFixed(2)}</span>
+                  </div>
+                  <div className="rounded-xl border p-2.5 flex flex-col items-center justify-center shadow-sm" style={{ borderColor: `${qaColor}33`, backgroundColor: `${qaColor}0a` }}>
+                    <span className="text-[9px] font-bold uppercase tracking-widest mb-1 opacity-80" style={{ color: qaColor }}>QA</span>
+                    <span className="text-sm font-bold tabular-nums">{qaResult.p >= 100 ? "100" : qaResult.p.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
