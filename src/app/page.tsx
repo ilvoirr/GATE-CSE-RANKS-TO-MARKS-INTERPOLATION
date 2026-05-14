@@ -209,9 +209,9 @@ export default function MarksAIR() {
   const catResult = interpolateCAT(currentCatTotal);
   
   // UI Sectional Results
-  const varcResult = interpolateCAT(catScores.varc * (198/72));
-  const dilrResult = interpolateCAT(catScores.dilr * (198/60));
-  const qaResult   = interpolateCAT(catScores.qa * (198/66));
+  const varcResult = interpolateCAT(catScores.varc * (204/72));
+  const dilrResult = interpolateCAT(catScores.dilr * (204/66));
+  const qaResult   = interpolateCAT(catScores.qa * (204/66));
 
   // Sync state between total and sections based on proportions
   const handleCatModeToggle = (newMode: CatInputMode) => {
@@ -220,8 +220,8 @@ export default function MarksAIR() {
       setCatTotalOnly(catScores.varc + catScores.dilr + catScores.qa);
     } else {
       const t = catTotalOnly;
-      const varc = Math.round(t * (72 / 198));
-      const dilr = Math.round(t * (60 / 198));
+      const varc = Math.round(t * (72 / 204));
+      const dilr = Math.round(t * (66 / 204));
       const qa = t - varc - dilr; // remainder guarantees exact sum
       setCatScores({ varc, dilr, qa });
     }
@@ -347,7 +347,7 @@ export default function MarksAIR() {
         const generateSectionData = (maxMarks: number) => {
           const d = [];
           for(let i=0; i<=maxMarks; i+=3) {
-            d.push({ x: i, y: 100 - interpolateCAT(i * (198/maxMarks)).p });
+            d.push({ x: i, y: 100 - interpolateCAT(i * (204/maxMarks)).p });
           }
           return d;
         };
@@ -363,7 +363,7 @@ export default function MarksAIR() {
           },
           {
             label: "DILR",
-            data: generateSectionData(60),
+            data: generateSectionData(66),
             borderColor: dilrColor,
             pointRadius: 0, pointHoverRadius: 0,
             borderWidth: 2, tension: 0.35, fill: false, borderDash: [4, 4],
@@ -487,9 +487,9 @@ export default function MarksAIR() {
       
       let varcP, dilrP, qaP;
       if (catInputMode === "sections") {
-        if (c <= 72) varcP = interpolateCAT(c * (198/72)).p;
-        if (c <= 60) dilrP = interpolateCAT(c * (198/60)).p;
-        if (c <= 66) qaP = interpolateCAT(c * (198/66)).p;
+        if (c <= 72) varcP = interpolateCAT(c * (204/72)).p;
+        if (c <= 66) dilrP = interpolateCAT(c * (204/66)).p;
+        if (c <= 66) qaP = interpolateCAT(c * (204/66)).p;
       }
       
       setHover({ x: tx, y: Math.max(8, mouseY - 44), marks: c, catR: r, catP: p, varcP, dilrP, qaP });
@@ -750,10 +750,10 @@ export default function MarksAIR() {
                   <div className={`p-3.5 rounded-xl border ${border} ${sfOff}`}>
                     <div className="flex justify-between items-end mb-2">
                       <label className="text-xs font-bold uppercase tracking-widest" style={{ color: accentCat }}>Total Marks</label>
-                      <span className="text-sm font-bold tabular-nums">{catTotalOnly} <span className={`text-[10px] font-medium opacity-60 ${muted}`}>/ 198</span></span>
+                      <span className="text-sm font-bold tabular-nums">{catTotalOnly} <span className={`text-[10px] font-medium opacity-60 ${muted}`}>/ 204</span></span>
                     </div>
                     <input
-                      type="range" min={0} max={198} step={1}
+                      type="range" min={0} max={204} step={1}
                       value={catTotalOnly}
                       onChange={(e) => setCatTotalOnly(parseInt(e.target.value))}
                       className="w-full cursor-pointer"
@@ -781,10 +781,10 @@ export default function MarksAIR() {
                     <div className="p-3 rounded-xl border" style={{ borderColor: `${dilrColor}33`, backgroundColor: `${dilrColor}0d` }}>
                       <div className="flex justify-between items-center mb-2">
                         <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: dilrColor }}>DILR</label>
-                        <span className="text-sm font-bold tabular-nums" style={{ color: text }}>{catScores.dilr} <span className="text-[10px] font-medium opacity-50">/ 60</span></span>
+                        <span className="text-sm font-bold tabular-nums" style={{ color: text }}>{catScores.dilr} <span className="text-[10px] font-medium opacity-50">/ 66</span></span>
                       </div>
                       <input
-                        type="range" min={0} max={60} step={1}
+                        type="range" min={0} max={66} step={1}
                         value={catScores.dilr}
                         onChange={(e) => setCatScores(prev => ({ ...prev, dilr: parseInt(e.target.value) }))}
                         className="w-full cursor-pointer"
@@ -811,15 +811,15 @@ export default function MarksAIR() {
                     <div className="mt-2 pt-3 border-t" style={{ borderColor: border }}>
                       <div className="flex justify-between items-center mb-2">
                         <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: accentCat2 }}>Master Total</label>
-                        <span className="text-sm font-bold tabular-nums">{currentCatTotal} <span className={`text-[10px] font-medium opacity-60 ${muted}`}>/ 198</span></span>
+                        <span className="text-sm font-bold tabular-nums">{currentCatTotal} <span className={`text-[10px] font-medium opacity-60 ${muted}`}>/ 204</span></span>
                       </div>
                       <input
-                        type="range" min={0} max={198} step={1}
+                        type="range" min={0} max={204} step={1}
                         value={currentCatTotal}
                         onChange={(e) => {
                           const t = parseInt(e.target.value);
-                          const varc = Math.round(t * (72 / 198));
-                          const dilr = Math.round(t * (60 / 198));
+                          const varc = Math.round(t * (72 / 204));
+                          const dilr = Math.round(t * (66 / 204));
                           const qa = t - varc - dilr;
                           setCatScores({ varc, dilr, qa });
                         }}
